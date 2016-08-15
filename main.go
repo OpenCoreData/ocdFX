@@ -10,14 +10,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/bbalet/stopwords"
 	uuid "github.com/twinj/uuid"
 )
-
-// func contentText(data []byte) string {
-
-// 	// POST data to tika and get back the text
-
-// }
 
 func visit(path string, f os.FileInfo, err error) error {
 
@@ -42,7 +37,7 @@ func visit(path string, f os.FileInfo, err error) error {
 	// req, err := sling.New().Post("http://upload.com/gophers")
 	url := "http://localhost:9998/tika"
 
-	// filter out some files that we don't want to index?
+	// filter out some files that we don't want to index? dot files, what else?
 	// filter out stop words and numbers?  No need to index these.
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(data))
 	// req.Header.Set("X-Custom-Header", "myvalue")
@@ -58,16 +53,17 @@ func visit(path string, f os.FileInfo, err error) error {
 	fmt.Println("response Status:", resp.Status)
 	fmt.Println("response Headers:", resp.Header)
 	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("response Body:", string(body))
+	cleanBody := stopwords.CleanString(string(body), "en", true)
+	fmt.Println("response Body:", cleanBody)
 
 	//  NEED the following SEVEN functions to be written...  all should be relatively easy...
 	//  Calls to Tike will be REST client calls.
 	//  Call to triple store a simple HTTP call with a teplated SPARQL query
 	// filemeta := GetFileMeta(path string, f os.FileInfo)  // Tika call  (do we need this?)
-	// contentText := GetFileContent()  // Tike call
+	// x contentText := GetFileContent()  // Tike call
 	// projMeta := GetProjectMeta()  // SPARQL call
-	// md5value := GetMD5Value()    // function call
-	// fileUUID := GenerateUUID()   // function call
+	// x md5value := GetMD5Value()    // function call
+	// x fileUUID := GenerateUUID()   // function call
 
 	// data := []byte("These pretzels are making me thirsty.")
 	//
