@@ -9,12 +9,30 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"unicode/utf8"
 
 	"github.com/bbalet/stopwords"
 	uuid "github.com/twinj/uuid"
 )
 
+// FileMetadata holds file metadata
+type FileMetadata struct {
+	MD5                   [16]byte
+	UUID                  string
+	LenContentNoStopWords int
+}
+
+func main() {
+	flag.Parse()
+	root := flag.Arg(0)
+
+	err := filepath.Walk(root, visit)
+	fmt.Printf("filepath.Walk() returned %v\n", err)
+}
+
 func visit(path string, f os.FileInfo, err error) error {
+
+	fileInfo := FileMetadata{}
 
 	if f.IsDir() {
 		dir := filepath.Base(path)
@@ -22,23 +40,16 @@ func visit(path string, f os.FileInfo, err error) error {
 		return nil
 	}
 
-	fmt.Printf("Visited file: %s\n", path)
-
-	//m5
+	// m5
 	data, _ := ioutil.ReadFile(path)
-	fmt.Printf("MD5:  %x", md5.Sum(data))
+	fileInfo.MD5 = md5.Sum(data)
 
-	//uuid
+	// uuid
 	u4 := uuid.NewV4()
-	fmt.Println(u4)
-	fmt.Printf("UUID: version %d variant %x: %s\n", u4.Version(), u4.Variant(), u4)
+	fileInfo.UUID = u4.String()
 
-	//content POST
-	// req, err := sling.New().Post("http://upload.com/gophers")
+	// content via Tika
 	url := "http://localhost:9998/tika"
-
-	// filter out some files that we don't want to index? dot files, what else?
-	// filter out stop words and numbers?  No need to index these.
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(data))
 	// req.Header.Set("X-Custom-Header", "myvalue")
 	req.Header.Set("Accept", "text/plain")
@@ -50,35 +61,24 @@ func visit(path string, f os.FileInfo, err error) error {
 	}
 	defer resp.Body.Close()
 
-	fmt.Println("response Status:", resp.Status)
-	fmt.Println("response Headers:", resp.Header)
+	// filter out some files that we don't want to index? dot files, what else?
+	// filter out stop words and numbers?  No need to index these.
+	fmt.Println("Response Status:", resp.Status)
+	// fmt.Println("response Headers:", resp.Header)
 	body, _ := ioutil.ReadAll(resp.Body)
 	cleanBody := stopwords.CleanString(string(body), "en", true)
-	fmt.Println("response Body:", cleanBody)
+	fileInfo.LenContentNoStopWords = utf8.RuneCountInString(cleanBody)
+
+	fmt.Printf("For file: %s \nMD5:\t%v \nUUID:\t%s \nContentLen:\t%v \n\n", path, fileInfo.MD5, fileInfo.UUID, fileInfo.LenContentNoStopWords)
 
 	//  NEED the following SEVEN functions to be written...  all should be relatively easy...
-	//  Calls to Tike will be REST client calls.
 	//  Call to triple store a simple HTTP call with a teplated SPARQL query
 	// filemeta := GetFileMeta(path string, f os.FileInfo)  // Tika call  (do we need this?)
 	// x contentText := GetFileContent()  // Tike call
 	// projMeta := GetProjectMeta()  // SPARQL call
-	// x md5value := GetMD5Value()    // function call
-	// x fileUUID := GenerateUUID()   // function call
-
-	// data := []byte("These pretzels are making me thirsty.")
-	//
-	// All the above should be in a struct..  from that JSON and RDF can be built.
 
 	// indexJSON()  // pass to Bleve for indexing
 	// generateTriples() // build triples and append to a flat file for later use in triple store
 
 	return nil
-}
-
-func main() {
-	flag.Parse()
-	root := flag.Arg(0)
-
-	err := filepath.Walk(root, visit)
-	fmt.Printf("filepath.Walk() returned %v\n", err)
 }

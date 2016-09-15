@@ -8,8 +8,11 @@ https://hub.docker.com/r/logicalspark/docker-tikaserver/ to run tika in server m
 
 ```
 docker pull logicalspark/docker-tikaserver
+
+docker run -d -p 9998:9998 logicalspark/docker-tikaserver
 ```
-We should be able to access this services via curl then for example.
+
+We should be able to access this services for testing via curl. For example:
 
 ```
 curl -T ../OCD_METADATA.xls  http://localhost:9998/tika --header "Accept: text/plain"
@@ -19,8 +22,12 @@ Returns the meta data as key/value pairs one per line. You can also have Tika re
 
 curl -H "Accept: application/json" -T testWORD.doc http://example.com:9998/meta
 [Update 2015-01-19] Previously the comment said that tika-server.jar is not available as download. Fixed that since it actually does exist as a binary download.
+```
 
+Run the example Go code with:
 
+```
+go run main.go  ~/Desktop/tikeTestDirectory     
 ```
 
 We can then build out our Go code to walk the files and build out the metadata 
@@ -47,6 +54,21 @@ This is just a collection of thoughts on this for now.
 	* converted to JSON and indexed in Bleve
 	* converted to RDF and stored in the triple store
 * For the quick FX aspect should be use BoltDB as a KV store to host the UUID to local file location information?  This would be fast, but if we accept hosting this in the triple store, wouldn't it be better to simply use that as the look up store?  For simplicity it is, so for now plan to use the triple store to resolve UUDI to local file location in ocdFX
+
+####Notes on paths
+File paths/folder names only sometimes map directly to the project name. However, in the cases where extra characters are present, a portion of the folder name does map: usually it’s:
+
+```
+[PROJECT CODE] [space] [parenthesis] [description] [parenthesis]
+```
+
+in other cases the folder name is just:
+
+```[PROJECT CODE]```
+
+in these cases they map directly. 
+
+So if you extract start of folder name to [space], or to [end of folder name] if no space is present, you should be able to get the mappings you need. 
 
 
 ###Refs
