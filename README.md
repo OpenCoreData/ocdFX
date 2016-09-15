@@ -1,7 +1,16 @@
-#ocdFX
-###An indexing and file exchange service for CSDCO files
+# ocdFX
+###### An indexing and file exchange service for CSDCO files
 
-####Intro
+### Intro
+There are three main sections to this README.
+
+* Tika: Simple section on using a docker container for Tika that does image OCR and a
+few other nice extensions out of box.
+* Indexer: The code that is building an index of the CSDCO files.
+* Proxy: A simple file exchange (FX) that will serve up locally hosted files at CSDCO 
+based on a UUID KV request process.  Similary to a DOI DX exchange system.  
+
+#### Tika Setup
 Initially for testing (and perhaps even for operation, we can use the docker file at
 https://hub.docker.com/r/logicalspark/docker-tikaserver/ to run tika in server mode.  This container effectively runs: java -jar tika-server-x.x.jar -h 0.0.0.0
 
@@ -33,7 +42,7 @@ go run main.go  ~/Desktop/tikeTestDirectory
 We can then build out our Go code to walk the files and build out the metadata 
 that we need.  
 
-####Indexer
+#### Indexer
 For the indexer we will want to provide the ability to walk the directory structure and build out the necessary metadata we want to index on.  For us this will be something like the following sequence:
 
 * Use Tika get file metadata.  While not the most useful for discovery, still worth getting and indexing
@@ -42,12 +51,12 @@ For the indexer we will want to provide the ability to walk the directory struct
 * Get the MD5 checksum of the file.  This will let us resolve if a file as changed or not and needs to be versioned and indexed.
 * Assign a local in house UUID for this file.  Then associate this with its location.  This will be the primary key we use to dereference the file we want and obtain its bitstream.
 
-####Questions
+##### Questions
 * A collection of files in a project will be called a "data collecton" or should be call this a "data set"?  Allow each file and or a zip collection of the files to be accessed?
 * Should each file get a node type of something like gl:datastream or something to designate it a file?  Same for collections?
 
 
-####Data Stores
+##### Data Stores
 This is just a collection of thoughts on this for now.  
 
 * Should the generated JSON document in the Indexer section above be stored in MongoDB as well as indexed by Bleve?  Or should be just index it and not worry about keeping it?  The fact we have an MD5 would tell us if we need to rebuild the index or not.  What purpose is there to having the JSON as well?  Perhaps converting it to JSON-LD and allowing graph based relations between the result sets?  Yes, this is likely valuable and easy to do once in RDF.  So, the metadata structure should be:
@@ -55,7 +64,7 @@ This is just a collection of thoughts on this for now.
 	* converted to RDF and stored in the triple store
 * For the quick FX aspect should be use BoltDB as a KV store to host the UUID to local file location information?  This would be fast, but if we accept hosting this in the triple store, wouldn't it be better to simply use that as the look up store?  For simplicity it is, so for now plan to use the triple store to resolve UUDI to local file location in ocdFX
 
-####Notes on paths
+##### Notes on paths
 File paths/folder names only sometimes map directly to the project name. However, in the cases where extra characters are present, a portion of the folder name does map: usually it’s:
 
 ```
@@ -71,7 +80,22 @@ in these cases they map directly.
 So if you extract start of folder name to [space], or to [end of folder name] if no space is present, you should be able to get the mappings you need. 
 
 
-###Refs
+#### Proxy
+The proxy is a simple file proxy to get the file.  It really just needs a KV store. So a key like the 
+UUID or later a DOI could be used.  The value then is just the local location of the file on the 
+filesystem or in a Mongo GridFS system.  Using something like BoltDB would work with the indexer making 
+a KV based on the UUID:path.  These values we are already building as part of the process.  
+
+One could make an arguement for a triple store approach but I not sure why.  We do want to associate
+these UUID's with the CSDCO project resource (triples) at some point.  We need to parse the directory 
+and hope (I mean "it will") get connected to a project.  I need to extract the file directory name and 
+do a SPARQL call against the CSDCO project triples to get this association.  This would be added to the 
+struct then too. Later this struct would be serialized to RDF and then nade available via the triple 
+store and used to make file to project connections. 
+
+
+
+### Refs
 * JAXRS http://wiki.apache.org/tika/TikaJAXRS
 * http://www.tutorialspoint.com/tika/tika_quick_guide.htm
 * https://lucidworks.com/blog/2009/09/02/content-extraction-with-tika/
