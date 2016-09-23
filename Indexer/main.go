@@ -19,7 +19,10 @@ import (
 type FileMetadata struct {
 	MD5                   [16]byte
 	UUID                  string
-	LenContentNoStopWords int
+	filename              string
+	LenContentNoStopWords int // will become content later
+	CSDCOProjName         string
+	CSDCOProjURI          string
 }
 
 func main() {
@@ -70,6 +73,16 @@ func visit(path string, f os.FileInfo, err error) error {
 	fileInfo.LenContentNoStopWords = utf8.RuneCountInString(cleanBody)
 
 	fmt.Printf("For file: %s \nMD5:\t%v \nUUID:\t%s \nContentLen:\t%v \n\n", path, fileInfo.MD5, fileInfo.UUID, fileInfo.LenContentNoStopWords)
+
+	//     fmt.Printf("is not dir: %s\n", path)
+	// fmt.Printf("Found: %s  %d\n", f.Name(), f.Size())
+
+	// // get path elements
+	// dir, file := filepath.Split(path)
+	//     fmt.Printf("input: %q\n\tdir: %q\n\tfile: %q\n", path, dir, file)
+
+	// // split so I can use a slice element in a lookup for metadata
+	// fmt.Printf("%q\n", strings.Split(path, "/"))
 
 	//  NEED the following SEVEN functions to be written...  all should be relatively easy...
 	//  Call to triple store a simple HTTP call with a teplated SPARQL query

@@ -2,30 +2,49 @@ package main
 
 import (
 	"bytes"
+	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
-	"time"
-
-	sparql "github.com/knakk/sparql"
+	"text/template"
 )
 
-const queries = `
-# Comments are ignored, except those tagging a query.
+// The XML I sadly have to marshal
+// <?xml version='1.0' encoding='UTF-8'?>
+// <sparql xmlns='http://www.w3.org/2005/sparql-results#'>
+//         <head>
+//                 <variable name='uri'/>
+//         </head>
+//         <results>
+//                 <result>
+//                         <binding name='uri'>
+//                                 <uri>http://opencoredata/id/resource/csdco/project/aafblp</uri>
+//                         </binding>
+//                 </result>
+//         </results>
+// </sparql>
 
-# tag: projcall
-SELECT DISTINCT *
-WHERE {
-   ?uri rdf:type <http://opencoredata.org/id/voc/csdco/v1/CSDCOProject> .
-   ?uri <http://opencoredata.org/id/voc/csdco/v1/project> "{{.Proj}}" .
-   ?uri ?p ?o .
+type SparqlResult struct {
+	XMLName xml.Name `xml:"sparql"`
+	Results Results  `xml:"results"`
 }
-`
+
+type Results struct {
+	Result Result `xml:"result"`
+}
+
+type Result struct {
+	Binding Binding `xml:"binding"`
+}
+
+type Binding struct {
+	Uri string `xml:"uri"`
+}
 
 func main() {
-	content, err := ioutil.ReadFile("testSet.txt")
+	content, err := ioutil.ReadFile("projectFolderList.txt") // testSet.txt  or projectFolderList.txt
 	if err != nil {
 		fmt.Printf("Error with ioutils %s\n", err)
 	}
@@ -33,101 +52,53 @@ func main() {
 
 	for _, line := range lines {
 		splits := strings.Split(line, " ")
+		res := CallHack(strings.TrimSpace(splits[0]))
 
-		fmt.Println(strings.TrimSpace(splits[0]))
+		v := SparqlResult{}
 
-		// need to make a SPARQL call for each and pull back the results...
-		// res := SPARQLCall(strings.TrimSpace(splits[0]), "projcall", "http://localhost:9999/blazegraph/namespace/csdco/sparql")
+		// fmt.Println(res)
 
-		res := CallHack("age")
+		err := xml.Unmarshal([]byte(res), &v)
+		if err != nil {
+			fmt.Printf("error: %v", err)
+			return
+		}
 
-		fmt.Println(res)
+		fmt.Printf("Matching %s to URI: %#v\n", strings.TrimSpace(splits[0]), v.Results.Result.Binding.Uri)
 
-		// solutionsTest := res.Solutions() // map[string][]rdf.Term
-		// for _, i := range solutionsTest {
-		// 	fmt.Println(i)
-		// }
 	}
 }
 
 func CallHack(age string) string {
 
-	// http://localhost:9999/blazegraph/namespace/csdco/sparql?query=SELECT DISTINCT * WHERE { ?uri rdf:type <http://opencoredata.org/id/voc/csdco/v1/CSDCOProject> . ?uri <http://opencoredata.org/id/voc/csdco/v1/project> "AAFBLP" . ?uri ?p ?o . }
+	const url = "http://localhost:9999/bigdata/namespace/csdco/sparql?query=SELECT%20DISTINCT%20%3Furi%20WHERE%20%20%7B%20%20%20%20%3Furi%20rdf%3Atype%20%3Chttp%3A%2F%2Fopencoredata.org%2Fid%2Fvoc%2Fcsdco%2Fv1%2FCSDCOProject%3E%20.%20%20%20%20%3Furi%20%3Chttp%3A%2F%2Fopencoredata.org%2Fid%2Fvoc%2Fcsdco%2Fv1%2Fproject%3E%20%22{{.}}%22%20.%20%20%7D"
 
-	//  < this & >
+	dt, err := template.New("RDF template").Parse(url)
+	if err != nil {
+		log.Printf("RDF template creation failed for hole data: %s", err)
+	}
 
-	// SELECT%20DISTINCT%20*%20WHERE%20%7B%20%3Furi%20rdf%3Atype%20%3Chttp%3A%2F%2Fopencoredata.org%2Fid%2Fvoc%2Fcsdco%2Fv1%2FCSDCOProject%3E%20.%20%3Furi%20%3Chttp%3A%2F%2Fopencoredata.org%2Fid%2Fvoc%2Fcsdco%2Fv1%2Fproject%3E%20%22AAFBLP%22%20.%20%3Furi%20%3Fp%20%3Fo%20.%20%7D
+	var buff = bytes.NewBufferString("")
+	err = dt.Execute(buff, age)
+	if err != nil {
+		log.Printf("RDF template execution failed: %s", err)
+	}
 
-	const url = "http://localhost:9999/bigdata/namespace/csdco/sparql?query=SELECT%20DISTINCT%20*%20WHERE%20%7B%20%3Furi%20rdf%3Atype%20%3Chttp%3A%2F%2Fopencoredata.org%2Fid%2Fvoc%2Fcsdco%2Fv1%2FCSDCOProject%3E%20.%20%3Furi%20%3Chttp%3A%2F%2Fopencoredata.org%2Fid%2Fvoc%2Fcsdco%2Fv1%2Fproject%3E%20%22AAFBLP%22%20.%20%3Furi%20%3Fp%20%3Fo%20.%20%7D"
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", string(buff.Bytes()), nil)
 
-	req, _ := http.NewRequest("GET", url, nil)
-	// req.Header.Add("accept", "application/sparql-results+json")
-	req.Header.Add("accept", "text/csv")
-	res, _ := http.DefaultClient.Do(req)
+	//  Not working, so I have to do crappy XML decoding
+	// req.Header.Add("Accept", "application/sparql-results+json")
+	// req.Header.Add("cache-control", "no-cache")
+	// req.Header.Add("accept-encoding", "gzip, deflate")
+
+	// fmt.Println(req.Header)
+
+	res, _ := client.Do(req)
 
 	defer res.Body.Close()
 	body, _ := ioutil.ReadAll(res.Body)
 
 	return string(body)
 
-	// dt, err := template.New("RDF template").Parse(url)
-	// if err != nil {
-	// 	log.Printf("RDF template creation failed for hole data: %s", err)
-	// }
-
-	// var buff = bytes.NewBufferString("")
-	// err = dt.Execute(buff, age)
-	// if err != nil {
-	// 	log.Printf("RDF template execution failed: %s", err)
-	// }
-
-	// req, _ := http.NewRequest("GET", string(buff.Bytes()), nil)
-
-	// res, _ := http.DefaultClient.Do(req)
-
-	// defer res.Body.Close()
-	// body, _ := ioutil.ReadAll(res.Body)
-
-	// csiroStruct := CSIROStruct{}
-	// json.Unmarshal(body, &csiroStruct)
-
-	// // loop on csiroStruct.Results.Bindings
-	// for _, item := range csiroStruct.Results.Bindings {
-	// 	fmt.Println(item.Era.Type)
-	// 	fmt.Println(item.Era.Value)
-	// 	fmt.Println(item.Name.Type)
-	// 	fmt.Println(item.Name.Value)
-	// }
-
-	// fmt.Println(string(body))
-
-}
-
-// SPARQLCall ref janusCSVtoGraph (there is a SPAQL call there)
-func SPARQLCall(project string, query string, endpoint string) *sparql.Results {
-	repo, err := sparql.NewRepo(endpoint,
-		sparql.Timeout(time.Millisecond*15000),
-	)
-	if err != nil {
-		log.Printf("Error 1 %s\n", err)
-	}
-
-	f := bytes.NewBufferString(queries)
-	bank := sparql.LoadBank(f)
-
-	q, err := bank.Prepare(query, struct{ Proj string }{project})
-	if err != nil {
-		log.Printf("Error 2 %s\n", err)
-	}
-
-	fmt.Println(q)
-
-	//qv2 := "SELECT%20DISTINCT%20*%20WHERE%20%7B%20%3Furi%20rdf%3Atype%20%3Chttp%3A%2F%2Fopencoredata.org%2Fid%2Fvoc%2Fcsdco%2Fv1%2FCSDCOProject%3E%20.%20%3Furi%20%3Chttp%3A%2F%2Fopencoredata.org%2Fid%2Fvoc%2Fcsdco%2Fv1%2Fproject%3E%20%22AAFBLP%22%20.%20%3Furi%20%3Fp%20%3Fo%20.%20%7D"
-
-	res, err := repo.Query(q)
-	if err != nil {
-		log.Printf("Error 3 %s\n", err)
-	}
-
-	return res
 }
