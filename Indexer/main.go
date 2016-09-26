@@ -13,6 +13,7 @@ import (
 
 	"github.com/bbalet/stopwords"
 	"github.com/blevesearch/bleve"
+	rdf "github.com/knakk/rdf"
 	uuid "github.com/twinj/uuid"
 )
 
@@ -49,6 +50,7 @@ func dirSize(path string) (int64, error) {
 	}
 
 	// TODO Create the triple store set
+	tr := []rdf.Triple{}
 
 	var size int64
 	err := filepath.Walk(path, func(_ string, f os.FileInfo, err error) error {
@@ -92,7 +94,33 @@ func dirSize(path string) (int64, error) {
 			}
 
 			// TODO Build the triples here and then append to the master set
+			newsub, _ := rdf.NewIRI(fmt.Sprintf("http://opencoredata/id/resource/csdco/datafile/%s", fileInfo.UUID)) // Sprintf a correct URI here
+			newpred0, _ := rdf.NewIRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+			newobj0, _ := rdf.NewIRI("http://opencoredata.org/id/voc/csdco/v1/Datafile")
+			newtriple0 := rdf.Triple{Subj: newsub, Pred: newpred0, Obj: newobj0}
 
+			newpred1, _ := rdf.NewIRI("http://opencoredata.org/id/voc/csdco/v1/fileuuid")
+			newobj1, _ := rdf.NewLiteral(fileInfo.UUID)
+			newtriple1 := rdf.Triple{Subj: newsub, Pred: newpred1, Obj: newobj1}
+
+			newpred2, _ := rdf.NewIRI("http://opencoredata.org/id/voc/csdco/v1/size")
+			newobj2, _ := rdf.NewLiteral(fileInfo.LenContentNoStopWords)
+			newtriple2 := rdf.Triple{Subj: newsub, Pred: newpred2, Obj: newobj2}
+
+			newpred3, _ := rdf.NewIRI("http://opencoredata.org/id/voc/csdco/v1/name")
+			newobj3, _ := rdf.NewLiteral(file)
+			newtriple3 := rdf.Triple{Subj: newsub, Pred: newpred3, Obj: newobj3}
+
+			newpred4, _ := rdf.NewIRI("http://opencoredata.org/id/voc/csdco/v1/Project")
+			newobj4, _ := rdf.NewIRI("project URI here")
+			newtriple4 := rdf.Triple{Subj: newsub, Pred: newpred4, Obj: newobj4}
+
+			// will any every need to be skipped to add triples?
+			tr = append(tr, newtriple0)
+			tr = append(tr, newtriple1)
+			tr = append(tr, newtriple2)
+			tr = append(tr, newtriple3)
+			tr = append(tr, newtriple4)
 			// // split so I can use a slice element in a lookup for metadata
 			// fmt.Printf("%q\n", strings.Split(path, "/"))
 
@@ -102,6 +130,7 @@ func dirSize(path string) (int64, error) {
 	})
 
 	// TODO close out and serialize the triples to a file...
+	fmt.Println(tr)
 
 	return size, err
 }
