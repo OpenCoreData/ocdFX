@@ -71,6 +71,15 @@ func main() {
 
 func CallHack(age string) string {
 
+	// Example SPARQL call used
+	// SELECT DISTINCT *
+	// WHERE
+	// {
+	//   ?uri rdf:type <http://opencoredata.org/id/voc/csdco/v1/CSDCOProject> .
+	//   ?uri <http://opencoredata.org/id/voc/csdco/v1/project> "AAFBLP" .
+	//   ?uri ?p ?o .
+	// }
+
 	const url = "http://localhost:9999/bigdata/namespace/csdco/sparql?query=SELECT%20DISTINCT%20%3Furi%20WHERE%20%20%7B%20%20%20%20%3Furi%20rdf%3Atype%20%3Chttp%3A%2F%2Fopencoredata.org%2Fid%2Fvoc%2Fcsdco%2Fv1%2FCSDCOProject%3E%20.%20%20%20%20%3Furi%20%3Chttp%3A%2F%2Fopencoredata.org%2Fid%2Fvoc%2Fcsdco%2Fv1%2Fproject%3E%20%22{{.}}%22%20.%20%20%7D"
 
 	dt, err := template.New("RDF template").Parse(url)
