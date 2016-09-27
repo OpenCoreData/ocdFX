@@ -1,12 +1,12 @@
-Below are the match results.  Not all, but the majority we should review for now.
-I was able to match:
+Below are the match results. 
 
 Out of 519 lookups I found 421.  So the question is why am I missing so many 
 as I compare against the provided projects file data.  
 
-For example, AGZ, APIRE, and ARBLAG is not in LacCore_holes.csv
+For example; APIRE,  ARBLAG, AT15 are not in the updated graph still.
 
-Am I looking/searching on the wrong thing or do I not have all the data I need?
+
+
 
 Matching AAFBLP to URI: "http://opencoredata.org/id/csdco/project/v1/AAFBLP"
 Matching AAR(Antibiotic to URI: ""
