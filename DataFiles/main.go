@@ -9,7 +9,32 @@ import (
 	"net/http"
 	"strings"
 	"text/template"
+
+	sparql "github.com/knakk/sparql"
 )
+
+const queries = `
+# Comments are ignored, except those tagging a query.
+
+# tag: test1
+SELECT DISTINCT *
+WHERE 
+{ 
+  ?uri rdf:type <http://opencoredata.org/id/voc/csdco/v1/CSDCOProject> . 
+  ?uri <http://opencoredata.org/id/voc/csdco/v1/project> "{{.}}" . 
+  ?uri ?p ?o . 
+}
+
+# tag: urionly
+SELECT DISTINCT ?uri
+WHERE 
+{ 
+  ?uri rdf:type <http://opencoredata.org/id/voc/csdco/v1/CSDCOProject> . 
+  ?uri <http://opencoredata.org/id/voc/csdco/v1/project> "{{.}}" . 
+  ?uri ?p ?o . 
+}
+
+`
 
 // The XML I sadly have to marshal
 // <?xml version='1.0' encoding='UTF-8'?>
@@ -44,7 +69,7 @@ type Binding struct {
 }
 
 func main() {
-	content, err := ioutil.ReadFile("projectFolderList.txt") // testSet.txt  or projectFolderList.txt
+	content, err := ioutil.ReadFile("testSet.txt") // testSet.txt  or projectFolderList.txt
 	if err != nil {
 		fmt.Printf("Error with ioutils %s\n", err)
 	}
@@ -52,24 +77,63 @@ func main() {
 
 	for _, line := range lines {
 		splits := strings.Split(line, " ")
-		res := CallHack(strings.TrimSpace(splits[0]))
-
-		v := SparqlResult{}
-
-		// fmt.Println(res)
-
-		err := xml.Unmarshal([]byte(res), &v)
-		if err != nil {
-			fmt.Printf("error: %v", err)
-			return
-		}
-
-		fmt.Printf("Matching %s to URI: %#v\n", strings.TrimSpace(splits[0]), v.Results.Result.Binding.Uri)
-
+		ss := strings.TrimSpace(splits[0])
+		res := blazeCall(ss)
+		fmt.Printf("Project %s with URL %s \n", ss, res)
 	}
+
+	// for _, line := range lines {
+	// 	splits := strings.Split(line, " ")
+	// 	res := callHack(strings.TrimSpace(splits[0]))
+
+	// 	v := SparqlResult{}
+
+	// 	// fmt.Println(res)
+
+	// 	err := xml.Unmarshal([]byte(res), &v)
+	// 	if err != nil {
+	// 		fmt.Printf("error: %v", err)
+	// 		return
+	// 	}
+
+	// 	fmt.Printf("Matching %s to URI: %#v\n", strings.TrimSpace(splits[0]), v.Results.Result.Binding.Uri)
+	// }
+
 }
 
-func CallHack(age string) string {
+// try blaze again with SPARQL library now that it's fixed to address the JSON issue
+func blazeCall(project string) string {
+	repo, err := sparql.NewRepo("http://localhost:9999/blazegraph/namespace/csdco/sparql")
+	// repo, err := sparql.NewRepo("http://opencoredata.org/sparql")
+
+	if err != nil {
+		log.Printf("query make repo: %v\n", err)
+	}
+
+	f := bytes.NewBufferString(queries)
+	bank := sparql.LoadBank(f)
+
+	q, err := bank.Prepare("urionly", project)
+	if err != nil {
+		log.Printf("query bank prepair: %v\n", err)
+	}
+
+	res, err := repo.Query(q)
+
+	if err != nil {
+		log.Printf("query call: %v\n", err)
+	}
+
+	bindingsTest := res.Results.Bindings // map[string][]rdf.Term
+	var URI string
+	for _, i := range bindingsTest {
+		URI = fmt.Sprintf("%v", i["uri"].Value)
+	}
+	return URI
+}
+
+// crappy hack call when I was having issues getting blazegraph to return JSON
+func callHack(project string) string {
 
 	// Example SPARQL call used
 	// SELECT DISTINCT *
@@ -88,7 +152,7 @@ func CallHack(age string) string {
 	}
 
 	var buff = bytes.NewBufferString("")
-	err = dt.Execute(buff, age)
+	err = dt.Execute(buff, project)
 	if err != nil {
 		log.Printf("RDF template execution failed: %s", err)
 	}

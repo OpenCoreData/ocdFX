@@ -13,3 +13,4 @@ ALE
 ALK (Alkaline Lakes)
 ALMP (Arctic Lake monitoring Project)
 ANCH (Anchorage)
+FOOFOOFOO  A test of a bad project name
