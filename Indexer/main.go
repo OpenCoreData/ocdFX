@@ -331,7 +331,7 @@ func dirSize(path string) (int64, error) {
 					fmt.Printf("Bleve error indexing %v \n", berr)
 				}
 
-				// TODO Build the triples here and then append to the master set
+				//  Build the triples here and then append to the master set
 				newsub, _ := rdf.NewIRI(fmt.Sprintf("http://opencoredata/id/resource/csdco/datafile/%s", fileInfo.UUID)) // Sprintf a correct URI here
 				newpred0, _ := rdf.NewIRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
 				newobj0, _ := rdf.NewIRI("http://opencoredata.org/id/voc/csdco/v1/Datafile")
@@ -378,6 +378,9 @@ func dirSize(path string) (int64, error) {
 				newtriple6 := rdf.Triple{Subj: newsub, Pred: newpred6, Obj: newobj6}
 
 				// TODO  add in MD5 value
+				newpred7, _ := rdf.NewIRI("http://opencoredata.org/id/voc/csdco/v1/FileMD5")
+				newobj7, _ := rdf.NewLiteral(fmt.Sprintf("%x", fileInfo.MD5))
+				newtriple7 := rdf.Triple{Subj: newsub, Pred: newpred7, Obj: newobj7}
 
 				// will any every need to be skipped to add triples?
 				tr = append(tr, newtriple0)
@@ -387,6 +390,7 @@ func dirSize(path string) (int64, error) {
 				tr = append(tr, newtriple4v2)
 				tr = append(tr, newtriple5)
 				tr = append(tr, newtriple6)
+				tr = append(tr, newtriple7)
 
 				// // split so I can use a slice element in a lookup for metadata
 				// fmt.Printf("%q\n", strings.Split(path, "/"))
