@@ -24,20 +24,20 @@ const queries = `
 
 # tag: test1
 SELECT DISTINCT *
-WHERE 
-{ 
-  ?uri rdf:type <http://opencoredata.org/id/voc/csdco/v1/CSDCOProject> . 
-  ?uri <http://opencoredata.org/id/voc/csdco/v1/project> "{{.}}" . 
-  ?uri ?p ?o . 
+WHERE
+{
+  ?uri rdf:type <http://opencoredata.org/id/voc/csdco/v1/CSDCOProject> .
+  ?uri <http://opencoredata.org/id/voc/csdco/v1/project> "{{.}}" .
+  ?uri ?p ?o .
 }
 
 # tag: urionly
 SELECT DISTINCT ?uri
-WHERE 
-{ 
-  ?uri rdf:type <http://opencoredata.org/id/voc/csdco/v1/CSDCOProject> . 
-  ?uri <http://opencoredata.org/id/voc/csdco/v1/project> "{{.}}" . 
-  ?uri ?p ?o . 
+WHERE
+{
+  ?uri rdf:type <http://opencoredata.org/id/voc/csdco/v1/CSDCOProject> .
+  ?uri <http://opencoredata.org/id/voc/csdco/v1/project> "{{.}}" .
+  ?uri ?p ?o .
 }
 
 `
@@ -391,6 +391,11 @@ func dirSize(path string) (int64, error) {
 				// // split so I can use a slice element in a lookup for metadata
 				// fmt.Printf("%q\n", strings.Split(path, "/"))
 
+				// I could write each collection of triples to a file at the fileID level here.  As they are .nt
+				// I could then just cat them together.  Still, while a good checkpoint concept..  I don't really
+				// do any real checkpoint approach here..  perhaps if I add that (like a boltdb with KV values in it
+				// of completed files )  I can revist how this tr data is managed.
+
 				fmt.Printf("For path:\t%s \nFor dir:\t%s\nFor file:\t%s\nMD5:\t%x \nUUID:\t%s  \n\n", fp, dir, file, fileInfo.MD5, fileInfo.UUID)
 			}
 
@@ -418,7 +423,7 @@ func writeFile(name string, tr []rdf.Triple) {
 	// Create the output file
 	outFile, err := os.Create(name)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) // why Fatal on creating the file?  If I can't make it I can't make it...
 	}
 	defer outFile.Close()
 
@@ -430,7 +435,7 @@ func writeFile(name string, tr []rdf.Triple) {
 	// err = enc.Encode(newtriple)
 	enc.Close()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) // why Fatal on encoding?
 	}
 }
 
@@ -490,7 +495,7 @@ func visit(path string, f os.FileInfo, err error) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		panic(err) // why panic here?
 	}
 	defer resp.Body.Close()
 
