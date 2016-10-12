@@ -61,6 +61,9 @@ func main() {
 	// fmt.Printf("filepath.Walk() returned %v\n", err)
 
 	size, err := dirSize(root)
+	if err != nil {
+		fmt.Println(err)
+	}
 	fmt.Printf("dirSize returned %d %v\n", size, err)
 }
 
@@ -75,10 +78,10 @@ func dirSize(path string) (int64, error) {
 		fmt.Printf("Bleve error making index %v \n", berr)
 	}
 
-	// TODO Create the triple store set
+	//Create the triple store set and size var
 	tr := []rdf.Triple{}
-
 	var size int64
+
 	err := filepath.Walk(path, func(fp string, f os.FileInfo, err error) error {
 		if !f.IsDir() {
 
@@ -288,7 +291,10 @@ func dirSize(path string) (int64, error) {
 				// fmt.Printf("%s\n", FQP)
 
 				// md5
-				data, _ := ioutil.ReadFile(fp)
+				data, err := ioutil.ReadFile(fp)
+				if err != nil {
+					fmt.Println(err)
+				}
 				fileInfo.MD5 = md5.Sum(data)
 
 				// uuid
@@ -312,7 +318,10 @@ func dirSize(path string) (int64, error) {
 
 				// filter out some files that we don't want to index? dot files, what else?
 				fmt.Println("Response Status:", resp.Status)
-				body, _ := ioutil.ReadAll(resp.Body)
+				body, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					fmt.Println(err)
+				}
 				// cleanBody := stopwords.CleanString(string(body), "en", true)
 				fileInfo.ContentNoStopWords = stopwords.CleanString(string(body), "en", true) // .LenContentNoStopWords = utf8.RuneCountInString(cleanBody)
 				dir, file := filepath.Split(fp)
@@ -340,13 +349,25 @@ func dirSize(path string) (int64, error) {
 				newobj3, _ := rdf.NewLiteral(file)
 				newtriple3 := rdf.Triple{Subj: newsub, Pred: newpred3, Obj: newobj3}
 
-				// TODO:  flesh this out to finish this and the todo below..  then delete the DataFiles directory and files
-				// projectURI := blazeCall(projectID)
+				//  Project IRI if I make a match
+				projectURI := blazeCall(projectID)
+				if projectURI != "" {
+					newpred4, err := rdf.NewIRI("http://opencoredata.org/id/voc/csdco/v1/Project")
+					if err != nil {
+						fmt.Println(err)
+					}
+					newobj4, err := rdf.NewIRI(projectURI)
+					if err != nil {
+						fmt.Println(err)
+					}
+					newtriple4 := rdf.Triple{Subj: newsub, Pred: newpred4, Obj: newobj4}
+					tr = append(tr, newtriple4)
+				}
 
-				//  TODO:  this should be a literial and a IRI matched (if possible) through the other code in DataFiles
-				newpred4, _ := rdf.NewIRI("http://opencoredata.org/id/voc/csdco/v1/Project")
-				newobj4, _ := rdf.NewIRI(fmt.Sprintf("http://opencoredata.org/id/csdco/project/v1/%s", projectID)) // should this be lower case, or just a literial (need a IRI at some point though)
-				newtriple4 := rdf.Triple{Subj: newsub, Pred: newpred4, Obj: newobj4}
+				// Project name in as a literal
+				newpred4v2, _ := rdf.NewIRI("http://opencoredata.org/id/voc/csdco/v1/ProjectName")
+				newobj4v2, _ := rdf.NewLiteral(projectID)
+				newtriple4v2 := rdf.Triple{Subj: newsub, Pred: newpred4v2, Obj: newobj4v2}
 
 				newpred5, _ := rdf.NewIRI("http://opencoredata.org/id/voc/csdco/v1/FileType")
 				newobj5, _ := rdf.NewIRI(predicate)
@@ -356,12 +377,14 @@ func dirSize(path string) (int64, error) {
 				newobj6, _ := rdf.NewLiteral(fp)
 				newtriple6 := rdf.Triple{Subj: newsub, Pred: newpred6, Obj: newobj6}
 
+				// TODO  add in MD5 value
+
 				// will any every need to be skipped to add triples?
 				tr = append(tr, newtriple0)
 				tr = append(tr, newtriple1)
 				// tr = append(tr, newtriple2)
 				tr = append(tr, newtriple3)
-				tr = append(tr, newtriple4)
+				tr = append(tr, newtriple4v2)
 				tr = append(tr, newtriple5)
 				tr = append(tr, newtriple6)
 
@@ -372,12 +395,16 @@ func dirSize(path string) (int64, error) {
 			}
 
 		}
+		if err != nil {
+			fmt.Println(err)
+		}
 		return err
 	})
 
-	// TODO close out and serialize the triples to a file...
-	// fmt.Println(tr)
-
+	if err != nil {
+		fmt.Println(err)
+	}
+	// Serialize the triples to a file...
 	writeFile("./indexerTriples.nt", tr)
 
 	return size, err
@@ -391,7 +418,7 @@ func writeFile(name string, tr []rdf.Triple) {
 	// Create the output file
 	outFile, err := os.Create(name)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	defer outFile.Close()
 
@@ -434,6 +461,7 @@ func blazeCall(project string) string {
 	for _, i := range bindingsTest {
 		URI = fmt.Sprintf("%v", i["uri"].Value)
 	}
+
 	return URI
 }
 
