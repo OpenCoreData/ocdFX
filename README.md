@@ -94,6 +94,19 @@ struct then too. Later this struct would be serialized to RDF and then nade avai
 store and used to make file to project connections. 
 
 
+## Types
+
+http://opencoredata.org/id/voc/csdco/v1/metadata
+http://opencoredata.org/id/voc/csdco/v1/dtubeMetadata
+http://opencoredata.org/id/voc/csdco/v1/srf
+http://opencoredata.org/id/voc/csdco/v1/cml
+http://opencoredata.org/id/voc/csdco/v1/car
+http://opencoredata.org/id/voc/csdco/v1/image
+http://opencoredata.org/id/voc/csdco/v1/rgbData
+http://opencoredata.org/id/voc/csdco/v1/wholeCoreData
+http://opencoredata.org/id/voc/csdco/v1/geotekHighResMSdata
+http://opencoredata.org/id/voc/csdco/v1/icdFiles
+
 
 ### Refs
 * JAXRS http://wiki.apache.org/tika/TikaJAXRS

@@ -74,19 +74,21 @@ func dirSize(path string) (int64, error) {
 	mapping := bleve.NewIndexMapping()
 	// analyzer := mapping.Ad
 	index, berr := bleve.New("csdcoFX.bleve", mapping)
+	berr = index.Close()
 	if berr != nil {
 		fmt.Printf("Bleve error making index %v \n", berr)
 	}
 
 	//Create the triple store set and size var
-	tr := []rdf.Triple{}
+	// tr := []rdf.Triple{}
 	var size int64
 
 	err := filepath.Walk(path, func(fp string, f os.FileInfo, err error) error {
 		if !f.IsDir() {
 
-			// for fun see how much we index...
-			size += f.Size()
+			// for fun see how much we index...  this is the file length in bytes (int64)
+			// 1MB = 1000000 bytes
+			size += f.Size() // use this to escape Tika indexing on files that are "too" big
 
 			// set up our predicate value..  if we end up not setting a predicate it's
 			// due to the fact we didn't match a file value and so we need to not index this
@@ -96,6 +98,18 @@ func dirSize(path string) (int64, error) {
 			pathElements := strings.Split(fp, "/")
 			projectIDSet := strings.Split(pathElements[5], " ")
 			projectID := projectIDSet[0]
+
+			// TODO..   work up dotfile escape element
+			// pass out of files with a period at the start
+			dotfile, err := filepath.Match(strings.ToLower(".*"), strings.ToLower(f.Name()))
+			if dotfile {
+				fmt.Println("Getting out..  found a dot file.")
+				return nil // get out now..  we are a file with a . at the start
+			}
+			if err != nil {
+				fmt.Println(err) // malformed pattern
+				return err       // this is fatal.
+			}
 
 			if caseInsenstiveContains(fp, "/") {
 
@@ -108,7 +122,7 @@ func dirSize(path string) (int64, error) {
 
 				// look for Dtube lable name...
 				if !matched {
-					matched, err = filepath.Match(strings.ToLower("*metadata format Dtube Lable_*"), strings.ToLower(f.Name())) // worry about case issue
+					matched, err = filepath.Match(strings.ToLower("*metadata format Dtube Label_*"), strings.ToLower(f.Name())) // worry about case issue
 					if matched {
 						predicate = "http://opencoredata.org/id/voc/csdco/v1/dtubeMetadata"
 					}
@@ -134,7 +148,8 @@ func dirSize(path string) (int64, error) {
 				if !matched {
 					matched, err = filepath.Match(strings.ToLower("*.car"), strings.ToLower(f.Name()))
 					if matched {
-						predicate = "http://opencoredata.org/id/voc/csdco/v1/car"
+						predicate = "" // for now ignore .car files.  they are too to index and are archives big as are .mov
+						// predicate = "http://opencoredata.org/id/voc/csdco/v1/car"
 					}
 				}
 				if err != nil {
@@ -210,9 +225,9 @@ func dirSize(path string) (int64, error) {
 				matched, err = filepath.Match(strings.ToLower("*_MSCL*"), strings.ToLower(f.Name()))
 				if matched {
 					// now check for correct extensions
-					matched, err = filepath.Match(strings.ToLower("*.xsl"), strings.ToLower(f.Name()))
+					matched, err = filepath.Match(strings.ToLower("*.xls"), strings.ToLower(f.Name()))
 					if !matched {
-						matched, err = filepath.Match(strings.ToLower("*.xsls"), strings.ToLower(f.Name()))
+						matched, err = filepath.Match(strings.ToLower("*.xlsx"), strings.ToLower(f.Name()))
 					}
 					if !matched {
 						return nil // done with this test loop..
@@ -283,19 +298,15 @@ func dirSize(path string) (int64, error) {
 			// start a if conditional here based on if we have a predicate value or not
 			if predicate != "" {
 
+				// for incremental file saving move tr inside the loop (and the write function at then of this scope)
+				tr := []rdf.Triple{}
+
 				// our struct for information
 				fileInfo := FileMetadata{}
 
 				// Not sure why when doing a closure I need to rebuild the path name...
 				// FQP := fmt.Sprintf("%s/%s", path, f.Name())
 				// fmt.Printf("%s\n", FQP)
-
-				// md5
-				data, err := ioutil.ReadFile(fp)
-				if err != nil {
-					fmt.Println(err)
-				}
-				fileInfo.MD5 = md5.Sum(data)
 
 				// uuid
 				u4 := uuid.NewV4()
@@ -304,31 +315,61 @@ func dirSize(path string) (int64, error) {
 				// set type from predicate
 				fileInfo.filetype = predicate
 
-				// content via Tika
-				url := "http://localhost:9998/tika"
-				req, err := http.NewRequest("PUT", url, bytes.NewBuffer(data))
-				req.Header.Set("Accept", "text/plain")
-
-				client := &http.Client{}
-				resp, err := client.Do(req)
+				// md5
+				data, err := ioutil.ReadFile(fp)
 				if err != nil {
 					fmt.Println(err)
 				}
-				defer resp.Body.Close()
+				fileInfo.MD5 = md5.Sum(data)
 
-				// filter out some files that we don't want to index? dot files, what else?
-				fmt.Println("Response Status:", resp.Status)
-				body, err := ioutil.ReadAll(resp.Body)
-				if err != nil {
-					fmt.Println(err)
+				iscar, err := filepath.Match(strings.ToLower("*.car"), strings.ToLower(f.Name()))
+				dir := ""
+				file := ""
+
+				if !iscar {
+
+					// md5
+					data, err := ioutil.ReadFile(fp)
+					if err != nil {
+						fmt.Println(err)
+					}
+					fileInfo.MD5 = md5.Sum(data)
+
+					// content via Tika
+					fmt.Println("in the NOT iscar file")
+
+					url := "http://localhost:9998/tika"
+					req, err := http.NewRequest("PUT", url, bytes.NewBuffer(data))
+					req.Header.Set("Accept", "text/plain")
+
+					client := &http.Client{}
+					resp, err := client.Do(req)
+					if err != nil {
+						fmt.Println(err)
+					}
+					defer resp.Body.Close()
+
+					fmt.Println("Response Status:", resp.Status)
+					body, err := ioutil.ReadAll(resp.Body)
+					if err != nil {
+						fmt.Println(err)
+					}
+					fileInfo.ContentNoStopWords = stopwords.CleanString(string(body), "en", true) // .LenContentNoStopWords = utf8.RuneCountInString(cleanBody)
+					dir, file = filepath.Split(fp)
+
+					// Bleve indexer
+					loopindex, berr := bleve.Open("csdcoFX.bleve")
+					berr = loopindex.Index(fileInfo.UUID, fileInfo)
+					berr = loopindex.Close()
+					if berr != nil {
+						fmt.Printf("Bleve error indexing %v \n", berr)
+					}
 				}
-				// cleanBody := stopwords.CleanString(string(body), "en", true)
-				fileInfo.ContentNoStopWords = stopwords.CleanString(string(body), "en", true) // .LenContentNoStopWords = utf8.RuneCountInString(cleanBody)
-				dir, file := filepath.Split(fp)
-
-				berr = index.Index(fileInfo.UUID, fileInfo)
-				if berr != nil {
-					fmt.Printf("Bleve error indexing %v \n", berr)
+				if iscar {
+					fmt.Println("in the iscar file")
+					dir, file = filepath.Split(fp)
+					var emtpyByte [16]byte
+					fileInfo.MD5 = emtpyByte
 				}
 
 				//  Build the triples here and then append to the master set
@@ -401,20 +442,28 @@ func dirSize(path string) (int64, error) {
 				// of completed files )  I can revist how this tr data is managed.
 
 				fmt.Printf("For path:\t%s \nFor dir:\t%s\nFor file:\t%s\nMD5:\t%x \nUUID:\t%s  \n\n", fp, dir, file, fileInfo.MD5, fileInfo.UUID)
+
+				// write out the file with the proj name  or if blanktime stamped
+				// Serialize the triples to a file...
+				filename := fmt.Sprintf("./rdf/%striples.nt", u4.String())
+				writeFile(filename, tr)
+
 			}
 
 		}
 		if err != nil {
 			fmt.Println(err)
 		}
+
 		return err
 	})
 
 	if err != nil {
 		fmt.Println(err)
 	}
-	// Serialize the triples to a file...
-	writeFile("./indexerTriples.nt", tr)
+
+	// Serialize the triples to a file...  original location
+	// writeFile("./rdf/indexerTriples.nt", tr)
 
 	return size, err
 }
@@ -474,6 +523,7 @@ func blazeCall(project string) string {
 	return URI
 }
 
+// visit  Deprectated function
 func visit(path string, f os.FileInfo, err error) error {
 	fileInfo := FileMetadata{}
 
