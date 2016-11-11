@@ -46,8 +46,8 @@ WHERE
 type FileMetadata struct {
 	MD5                [16]byte
 	UUID               string
-	filename           string
-	filetype           string
+	Filename           string
+	Filetype           string
 	ContentNoStopWords string // will become content later
 	CSDCOProjName      string
 	CSDCOProjURI       string
@@ -313,7 +313,8 @@ func dirSize(path string) (int64, error) {
 				fileInfo.UUID = u4.String()
 
 				// set type from predicate
-				fileInfo.filetype = predicate
+				fileInfo.Filetype = predicate
+				fileInfo.Filename = f.Name()
 
 				// md5
 				data, err := ioutil.ReadFile(fp)
