@@ -10,6 +10,55 @@ few other nice extensions out of box.
 * Proxy: A simple file exchange (FX) that will serve up locally hosted files at CSDCO 
 based on a UUID KV request process.  Similary to a DOI DX exchange system.  
 
+
+#### What is being Indexed
+
+Apart from issues of directory white lists and avoiding dot files the following items have 
+index loops.
+
+Looking in */* for 
+
+1) ```*-metadata*```
+2) ```*metadata format Dtube Label_*```
+3) ```*SRF*```
+4) ```*.cml```
+5) ```*.car```
+
+Looking in *Images/* for
+
+1) ```*.jpg```
+2) ```*.jpeg```
+3) ```*.tif```
+4) ```*.tiff```
+5) ```*.bmp```
+
+Looking in *Images/rgb* for
+
+1) ```*.csv```
+
+Looking in *Geotek Data/whole-core data*
+
+1) ```*_MSCL*```
+	1) ```*.xls```
+	2) ```*.xlsx```
+2) These are blacklisted (do not scan)
+	1) ```*.raw```
+	2) ```*.dat```
+	3) ```*.out```
+	4) ```*.cal```
+
+Looking in *Geotek Data/high-resolution MS data*
+
+1) ```*_HRMS*```  or  ```*_XYZ*```
+	1) ```*.xls```
+	2) ```*.xlsx```
+
+Looking in *ICD/*
+
+1) Do NOT index: ```ICD sheet.pdf```
+2) ```*.pdf```
+
+
 #### Tika Setup
 Initially for testing (and perhaps even for operation, we can use the docker file at
 https://hub.docker.com/r/logicalspark/docker-tikaserver/ to run tika in server mode.  This container effectively runs: java -jar tika-server-x.x.jar -h 0.0.0.0
@@ -95,7 +144,6 @@ store and used to make file to project connections.
 
 
 ## Types
-
 http://opencoredata.org/id/voc/csdco/v1/metadata
 http://opencoredata.org/id/voc/csdco/v1/dtubeMetadata
 http://opencoredata.org/id/voc/csdco/v1/srf

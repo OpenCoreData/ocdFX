@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/bbalet/stopwords"
 	"github.com/blevesearch/bleve"
@@ -100,7 +102,6 @@ func dirSize(path string) (int64, error) {
 			projectID := projectIDSet[0]
 
 			// TODO..   work up dotfile escape element
-			// pass out of files with a period at the start
 			dotfile, err := filepath.Match(strings.ToLower(".*"), strings.ToLower(f.Name()))
 			if dotfile {
 				fmt.Println("Getting out..  found a dot file.")
@@ -109,6 +110,20 @@ func dirSize(path string) (int64, error) {
 			if err != nil {
 				fmt.Println(err) // malformed pattern
 				return err       // this is fatal.
+			}
+
+			// TODO test getting file stats
+			if ageInYears(fp) < 2.0 {
+				fmt.Println("Getting out..  found a file < 2 years old.")
+				fmt.Println(fp)
+				return nil // get out now..  we are a too young
+			}
+
+			// TODO  check a whitelist
+			if !inApprovedList(projectID) {
+				fmt.Println("Getting out..  found a file not in white list.")
+				fmt.Println(fp)
+				return nil // get out now...  we are not wanted
 			}
 
 			if caseInsenstiveContains(fp, "/") {
@@ -295,7 +310,8 @@ func dirSize(path string) (int64, error) {
 				}
 			}
 
-			// start a if conditional here based on if we have a predicate value or not
+			// start a if conditional here based on if we have a predicate value or not.  If
+			// we do, we matched above...
 			if predicate != "" {
 
 				// for incremental file saving move tr inside the loop (and the write function at then of this scope)
@@ -323,12 +339,12 @@ func dirSize(path string) (int64, error) {
 				}
 				fileInfo.MD5 = md5.Sum(data)
 
+				// Corewall Archives (CARs) are too big to index..  skip them.
 				iscar, err := filepath.Match(strings.ToLower("*.car"), strings.ToLower(f.Name()))
 				dir := ""
 				file := ""
 
 				if !iscar {
-
 					// md5
 					data, err := ioutil.ReadFile(fp)
 					if err != nil {
@@ -337,7 +353,7 @@ func dirSize(path string) (int64, error) {
 					fileInfo.MD5 = md5.Sum(data)
 
 					// content via Tika
-					fmt.Println("in the NOT iscar file")
+					fmt.Println("Calling Tika...  can take some time")
 
 					url := "http://localhost:9998/tika"
 					req, err := http.NewRequest("PUT", url, bytes.NewBuffer(data))
@@ -469,6 +485,26 @@ func dirSize(path string) (int64, error) {
 	return size, err
 }
 
+func inApprovedList(projectName string) bool {
+	if projectName == "CAHO" {
+		return true
+	}
+	return false
+}
+
+func ageInYears(fp string) float64 {
+	fi, err := os.Stat(fp)
+	if err != nil {
+		fmt.Println(err)
+	}
+	stat := fi.Sys().(*syscall.Stat_t)
+	ctime := time.Unix(int64(stat.Ctimespec.Sec), int64(stat.Ctimespec.Nsec))
+	delta := time.Now().Sub(ctime)
+	years := delta.Hours() / 24 / 365
+	// fmt.Printf("Create: %v   making it %.2f  years old\n", ctime, years)
+	return years
+}
+
 func caseInsenstiveContains(a, b string) bool {
 	return strings.Contains(strings.ToUpper(a), strings.ToUpper(b))
 }
@@ -494,7 +530,7 @@ func writeFile(name string, tr []rdf.Triple) {
 }
 
 func blazeCall(project string) string {
-	repo, err := sparql.NewRepo("http://localhost:9999/blazegraph/namespace/csdco/sparql")
+	repo, err := sparql.NewRepo("http://localhost:19999/blazegraph/namespace/csdco/sparql")
 	// repo, err := sparql.NewRepo("http://opencoredata.org/sparql")
 
 	if err != nil {
