@@ -57,17 +57,7 @@ type FileMetadata struct {
 
 func main() {
 	flag.Parse()
-	root := flag.Arg(0) //  /Volumes/Doug/COLDEV/CSDdata
-
-	// Set up our log file for runs...
-	f, err := os.OpenFile("logfile.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	defer f.Close()
-	log.SetOutput(f)
-
-	log.Printf("Start time: %s \n", time.Now())
+	root := flag.Arg(0)
 
 	// err := filepath.Walk(root, visit)
 	// fmt.Printf("filepath.Walk() returned %v\n", err)
@@ -316,7 +306,7 @@ func dirSize(path string) (int64, error) {
 				}
 				if matched {
 					predicate = "http://opencoredata.org/id/voc/csdco/v1/icdFiles"
-					fmt.Printf("%s  %s  %s\n", projectID, predicate, fp) // almost a triple if I make the first part the file ID  (done elsewhere though)
+					fmt.Printf("%s : %s : %s\n", projectID, predicate, fp)
 				}
 			}
 
@@ -362,6 +352,9 @@ func dirSize(path string) (int64, error) {
 					}
 					fileInfo.MD5 = md5.Sum(data)
 
+					// content via Tika
+					fmt.Println("Calling Tika...  can take some time")
+
 					url := "http://localhost:9998/tika"
 					req, err := http.NewRequest("PUT", url, bytes.NewBuffer(data))
 					req.Header.Set("Accept", "text/plain")
@@ -373,7 +366,7 @@ func dirSize(path string) (int64, error) {
 					}
 					defer resp.Body.Close()
 
-					// fmt.Println("Tika Response Status:", resp.Status)
+					fmt.Println("Response Status:", resp.Status)
 					body, err := ioutil.ReadAll(resp.Body)
 					if err != nil {
 						fmt.Println(err)
@@ -397,7 +390,7 @@ func dirSize(path string) (int64, error) {
 				}
 
 				//  Build the triples here and then append to the master set
-				newsub, _ := rdf.NewIRI(fmt.Sprintf("http://opencoredata.org/id/resource/csdco/datafile/%s", fileInfo.UUID)) // Sprintf a correct URI here
+				newsub, _ := rdf.NewIRI(fmt.Sprintf("http://opencoredata/id/resource/csdco/datafile/%s", fileInfo.UUID)) // Sprintf a correct URI here
 				newpred0, _ := rdf.NewIRI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
 				newobj0, _ := rdf.NewIRI("http://opencoredata.org/id/voc/csdco/v1/Datafile")
 				newtriple0 := rdf.Triple{Subj: newsub, Pred: newpred0, Obj: newobj0}
@@ -415,10 +408,7 @@ func dirSize(path string) (int64, error) {
 				newtriple3 := rdf.Triple{Subj: newsub, Pred: newpred3, Obj: newobj3}
 
 				//  Project IRI if I make a match
-				projectURI, err := blazeCall(projectID)
-				if err != nil {
-					log.Println("Error access SPARQL server")
-				}
+				projectURI := blazeCall(projectID)
 				if projectURI != "" {
 					newpred4, err := rdf.NewIRI("http://opencoredata.org/id/voc/csdco/v1/Project")
 					if err != nil {
@@ -468,8 +458,7 @@ func dirSize(path string) (int64, error) {
 				// do any real checkpoint approach here..  perhaps if I add that (like a boltdb with KV values in it
 				// of completed files )  I can revist how this tr data is managed.
 
-				// fmt.Printf("Path Dir File MD5 UUID:\t%s \t%s \t%s \t%x \t%s  \n\n", fp, dir, file, fileInfo.MD5, fileInfo.UUID)
-				fmt.Printf("%s \t%x \t%s \t%s  \n\n", fileInfo.UUID, fileInfo.MD5, dir, file)
+				fmt.Printf("For path:\t%s \nFor dir:\t%s\nFor file:\t%s\nMD5:\t%x \nUUID:\t%s  \n\n", fp, dir, file, fileInfo.MD5, fileInfo.UUID)
 
 				// write out the file with the proj name  or if blanktime stamped
 				// Serialize the triples to a file...
@@ -496,8 +485,6 @@ func dirSize(path string) (int64, error) {
 	return size, err
 }
 
-// TODO  read this from a file, 1 line per project
-// Read into a string array and check for it in array
 func inApprovedList(projectName string) bool {
 	if projectName == "CAHO" {
 		return true
@@ -505,7 +492,6 @@ func inApprovedList(projectName string) bool {
 	return false
 }
 
-// ageInYears gets the age of a file as a float64 decimal value
 func ageInYears(fp string) float64 {
 	fi, err := os.Stat(fp)
 	if err != nil {
@@ -543,12 +529,12 @@ func writeFile(name string, tr []rdf.Triple) {
 	}
 }
 
-func blazeCall(project string) (string, error) {
+func blazeCall(project string) string {
 	repo, err := sparql.NewRepo("http://localhost:19999/blazegraph/namespace/csdco/sparql")
 	// repo, err := sparql.NewRepo("http://opencoredata.org/sparql")
+
 	if err != nil {
 		log.Printf("query make repo: %v\n", err)
-		return "", err
 	}
 
 	f := bytes.NewBufferString(queries)
@@ -557,13 +543,12 @@ func blazeCall(project string) (string, error) {
 	q, err := bank.Prepare("urionly", project)
 	if err != nil {
 		log.Printf("query bank prepair: %v\n", err)
-		return "", err
 	}
 
 	res, err := repo.Query(q)
+
 	if err != nil {
 		log.Printf("query call: %v\n", err)
-		return "", err
 	}
 
 	bindingsTest := res.Results.Bindings // map[string][]rdf.Term
@@ -572,7 +557,7 @@ func blazeCall(project string) (string, error) {
 		URI = fmt.Sprintf("%v", i["uri"].Value)
 	}
 
-	return URI, err
+	return URI
 }
 
 // visit  Deprectated function

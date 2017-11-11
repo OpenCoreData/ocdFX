@@ -165,4 +165,10 @@ http://opencoredata.org/id/voc/csdco/v1/icdFiles
 
 
 
+#### Minio notes
 
+docker run -d -p 9000:9000  -v /Users/dfils/Data/OCDDataVolumes/minio/data:/data  -v /Users/dfils/Data/OCDDataVolumes/minio/config:/root/.minio  minio/minio server /data
+
+
+"accessKey": "H6TDLL6XJUREIVJVS7RF",
+"secretKey": "pVtGhv85aX495qxjZ5HVYCwnGr9HRiamWMHvyU2r"
